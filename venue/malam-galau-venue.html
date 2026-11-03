@@ -679,6 +679,7 @@ function setView(k) {
   document.querySelectorAll('#views button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.view === k));
   applyVisibility();
 }
+window.__venue = { views: VIEWS, cam(p, t, f, plan) { state.view = plan ? 'plan' : 'tour'; applyVisibility(); camera.position.set(...p); controls.target.set(...t); camera.fov = f; camera.updateProjectionMatrix(); controls.update(); } };
 $('views').innerHTML = Object.entries(VIEWS).map(([k, v]) => `<button data-view="${k}" aria-pressed="false">${v.name}<span>${v.d}</span></button>`).join('');
 $('views').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setView(b.dataset.view); });
 
