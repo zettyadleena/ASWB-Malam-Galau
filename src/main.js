@@ -14,12 +14,18 @@ const W = Math.round(1080 * SCALE), H = Math.round(1920 * SCALE);
 // ---------------------------------------------------------------- timeline
 // Scene cuts (seconds). Tuned to the bridge of "Pulang" — add audio in IG/CapCut.
 const T = {
-  extEnd: 4.0,      // APU main entrance at night -> fly into the doors
-  topEnd: 7.6,      // atrium from the upper floors, looking down
-  singerEnd: 10.4,  // singer close-up
-  crowdEnd: 12.6,   // reverse shot: crowd singing with phone lights
-  end: 15.0,        // ASWB logo
+  skyEnd: 4.5,      // tilt down from the moon onto APU at night
+  extEnd: 7.5,      // low dolly along the wet road, fly through the main entrance
+  topEnd: 11.0,     // atrium from the upper floors, looking down
+  balcEnd: 13.5,    // across the void from a balcony, fairy lights in front
+  singerEnd: 16.5,  // singer close-up
+  bandEnd: 18.5,    // guitarist + drummer
+  crowdEnd: 21.0,   // reverse over the singer's shoulder: crowd singing
+  walkEnd: 23.5,    // walking through the crowd toward the stage
+  wideEnd: 26.0,    // wide finale from the back of the hall
+  end: 30.0,        // ASWB logo
 };
+const CUTS = [T.skyEnd, T.topEnd, T.balcEnd, T.singerEnd, T.bandEnd, T.crowdEnd, T.walkEnd];
 
 // ---------------------------------------------------------------- renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -340,16 +346,24 @@ function buildExterior() {
   rain.frustumCulled = false; s.add(rain);
 
   const cam = new THREE.PerspectiveCamera(52, W / H, 0.1, 2000);
-  const path = new THREE.CatmullRomCurve3([V(0, 16, 105), V(0, 11, 75), V(0, 6.5, 42), V(0, 3.4, 20), V(0, 2.3, 5.5)]);
+  const path = new THREE.CatmullRomCurve3([V(34, 1.5, 54), V(18, 1.7, 49), V(4, 2.0, 36), V(0, 2.2, 18), V(0, 2.3, 5.5)]);
   return {
     scene: s, camera: cam, bloom: [0.6, 0.5, 0.75],
     update(t) {
-      const p = clamp01(t / T.extEnd);
-      const u = 0.55 * p + 0.45 * p * p * p;
-      cam.position.copy(path.getPoint(u));
-      cam.position.x += Math.sin(t * 0.7) * 1.2 * (1 - u);
-      const target = V(0, lerp(19, 2.2, smooth(u * 1.05)), lerp(0, -10, u));
-      cam.lookAt(target);
+      if (t < T.skyEnd) {
+        // start on the moon & stars, tilt down onto the building
+        const u = easeInOut(t / T.skyEnd);
+        cam.fov = 52; cam.updateProjectionMatrix();
+        cam.position.set(lerp(-6, 0, u), lerp(9, 13, u), lerp(110, 88, u));
+        cam.lookAt(V(lerp(-110, 0, u), lerp(260, 15, u), lerp(-420, 0, u)));
+      } else {
+        // low along the wet road, swing toward the entrance and fly in
+        const p = clamp01((t - T.skyEnd) / (T.extEnd - T.skyEnd));
+        const u = 0.5 * p + 0.5 * p * p * p;
+        cam.fov = 58; cam.updateProjectionMatrix();
+        cam.position.copy(path.getPoint(u));
+        cam.lookAt(V(lerp(-6, 0, smooth(u * 1.4)), lerp(6, 2.2, u), lerp(10, -10, u)));
+      }
       for (let i = 0; i < N; i++) {
         const y = (((base[i * 3 + 1] - t * 48) % 70) + 70) % 70;
         const x = base[i * 3], z = base[i * 3 + 2];
@@ -494,6 +508,9 @@ function buildAtrium() {
   const rim = new THREE.SpotLight(0x6c74ff, 5, 30, 0.6, 0.6, 0); rim.position.set(-1, 9, STAGE_Z - 4); rim.target.position.set(0, 1.8, STAGE_Z + 1); s.add(rim, rim.target);
   const crowdL = new THREE.SpotLight(0xff9e6a, 1.3, 60, 0.75, 0.8, 0); crowdL.position.set(0, 12, STAGE_Z + 1); crowdL.target.position.set(0, 0, 0); s.add(crowdL, crowdL.target);
   const fill = new THREE.PointLight(0x7a5cff, 1.2, 40, 0); fill.position.set(0, 6, STAGE_Z - 2); s.add(fill);
+  for (const [x, z, col] of [[-4.2, -0.6, 0xffb36a], [4.2, -0.6, 0xffb36a], [0, -2.4, 0xd070ff]]) {
+    const sp = new THREE.SpotLight(col, 3.5, 25, 0.28, 0.7, 0); sp.position.set(x * 0.6, 10, STAGE_Z + z + 6); sp.target.position.set(x, 2, STAGE_Z + z); s.add(sp, sp.target);
+  }
   const hall = new THREE.PointLight(0xffb070, 0.6, 40, 0); hall.position.set(0, 10, 0); s.add(hall);
 
   // ---- band
@@ -541,7 +558,7 @@ function buildAtrium() {
   const cr = rng(2026);
   const people = [];
   for (let z = -22.5; z <= 14; z += 1.1) for (let x = -9.0; x <= 9.0; x += 1.0) {
-    if (cr() < 0.18) continue;
+    if (cr() < 0.18 || Math.abs(x) < 0.6) continue;
     people.push({
       x: x + (cr() - 0.5) * 0.4, z: z + (cr() - 0.5) * 0.4, s: 0.9 + cr() * 0.18, ry: (cr() - 0.5) * 0.4,
       phase: cr() * 6.28, raised: cr() < 0.45, side: cr() < 0.5 ? -1 : 1, hijab: cr() < 0.35,
@@ -653,28 +670,53 @@ function buildAtrium() {
     scene: s, camera: cam, bloom: [0.55, 0.5, 0.8],
     update(t) {
       updateCrowd(t); updateBand(t);
+      const shot = (a, b) => easeInOut((t - a) / (b - a));
+      cam.up.set(0, 1, 0);
       if (t < T.topEnd) {
         // from the upper floor railing, looking straight down, descending toward the stage
-        const u = easeInOut((t - T.extEnd) / (T.topEnd - T.extEnd));
+        const u = shot(T.extEnd, T.topEnd);
         cam.fov = lerp(82, 55, u); cam.updateProjectionMatrix();
         cam.position.set(lerp(-7.5, 1.5, u), lerp(33, 7.5, u), lerp(10, -12, u));
-        cam.up.set(0, 1, 0);
         const look = V(lerp(-2, 0, u), lerp(0, 2.6, u), lerp(-4, SZ, u));
-        // keep it "top-down" for the first part
         if (u < 0.3) cam.up.set(0, 0, -1);
         else cam.up.set(0, 0, -1).lerp(V(0, 1, 0), smooth((u - 0.3) / 0.5)).normalize();
         cam.lookAt(look);
+      } else if (t < T.balcEnd) {
+        // standing on a 2nd-floor balcony behind the railing, sliding along, fairy lights in front
+        const u = shot(T.topEnd, T.balcEnd);
+        cam.fov = 60; cam.updateProjectionMatrix();
+        cam.position.set(-10.35, 12.0, lerp(8, -4, u));
+        cam.lookAt(lerp(3, 1, u), lerp(0, 1.5, u), lerp(-10, -22, u));
       } else if (t < T.singerEnd) {
-        const u = easeInOut((t - T.topEnd) / (T.singerEnd - T.topEnd));
-        cam.fov = 38; cam.updateProjectionMatrix(); cam.up.set(0, 1, 0);
+        const u = shot(T.balcEnd, T.singerEnd);
+        cam.fov = 38; cam.updateProjectionMatrix();
         cam.position.set(lerp(2.1, 1.05, u), lerp(2.3, 2.75, u), SZ + lerp(4.4, 2.2, u));
         cam.lookAt(lerp(-0.1, -0.05, u), lerp(2.45, 2.8, u), SZ);
-      } else {
+      } else if (t < T.bandEnd) {
+        // low on the stage, orbiting the guitarist (drums behind him)
+        const u = shot(T.singerEnd, T.bandEnd);
+        cam.fov = 50; cam.updateProjectionMatrix();
+        const gx = -4.2, gz = STAGE_Z - 0.6, ang = lerp(0.15, -0.55, u), rad = lerp(3.0, 2.5, u);
+        cam.position.set(gx + Math.sin(ang) * rad, lerp(1.7, 2.0, u), gz + Math.cos(ang) * rad);
+        cam.lookAt(gx + 0.5, 2.35, gz - 0.3);
+      } else if (t < T.crowdEnd) {
         // reverse: over the singer's shoulder onto the crowd
-        const u = easeInOut((t - T.singerEnd) / (T.crowdEnd - T.singerEnd));
-        cam.fov = 50; cam.updateProjectionMatrix(); cam.up.set(0, 1, 0);
+        const u = shot(T.bandEnd, T.crowdEnd);
+        cam.fov = 50; cam.updateProjectionMatrix();
         cam.position.set(lerp(-1.4, -0.6, u), lerp(3.2, 3.6, u), SZ - lerp(1.6, 0.9, u));
         cam.lookAt(lerp(-0.6, 0.4, u), lerp(0.9, 1.3, u), 6);
+      } else if (t < T.walkEnd) {
+        // walking up the aisle through the crowd, phones all around
+        const u = shot(T.crowdEnd, T.walkEnd);
+        cam.fov = 62; cam.updateProjectionMatrix();
+        cam.position.set(Math.sin(t * 2.2) * 0.04, 1.85 + Math.sin(t * 6) * 0.015, lerp(10, -8, u));
+        cam.lookAt(0, 3.4, STAGE_Z);
+      } else {
+        // wide finale: from the back of the hall, craning up over everyone
+        const u = shot(T.walkEnd, T.wideEnd);
+        cam.fov = 58; cam.updateProjectionMatrix();
+        cam.position.set(lerp(-3, 2, u), lerp(3, 20, u), lerp(44, 40, u));
+        cam.lookAt(0, lerp(5, 2, u), STAGE_Z);
       }
     },
   };
@@ -731,7 +773,7 @@ async function buildLogo() {
   return {
     scene: s, camera: cam, bloom: [0.45, 0.5, 0.95],
     update(t) {
-      const lt = t - T.crowdEnd;
+      const lt = t - T.wideEnd;
       const a = easeOutBack((lt - 0.2) / 1.1);
       const sc = lerp(0.35, 1, a);
       logo.scale.setScalar(Math.max(0.001, sc));
@@ -748,7 +790,7 @@ async function buildLogo() {
       emb.geometry.attributes.position.needsUpdate = true;
       rb.forEach((b, i) => { const y = (((b[1] - lt * 14) % 26) + 26) % 26 - 13; rpos.set([b[0], y, b[2], b[0] + 0.12, y + 0.9, b[2]], i * 6); });
       rg.attributes.position.needsUpdate = true;
-      cam.position.set(0, 0, lerp(17.5, 15.5, easeOut(lt / 2.4)));
+      cam.position.set(0, 0, lerp(18, 15.5, easeOut(lt / 3.5)));
       cam.lookAt(0, 0.1, 0);
     },
   };
@@ -787,7 +829,7 @@ composer.addPass(grade);
 
 function pick(t) {
   if (t < T.extEnd) return ext;
-  if (t < T.crowdEnd) return atr;
+  if (t < T.wideEnd) return atr;
   return lgo;
 }
 
@@ -802,8 +844,9 @@ window.renderFrame = (t) => {
     fc.setRGB(1.0, 0.86, 0.66);
     fade = t < T.extEnd ? smooth((t - (T.extEnd - 0.45)) / 0.45) : 1 - smooth((t - T.extEnd) / 0.5);
   } else if (t < 0.5) { fc.setRGB(0, 0, 0); fade = 1 - smooth(t / 0.5); }
-  else if (Math.abs(t - T.topEnd) < 0.12) { fc.setRGB(0.02, 0.02, 0.06); fade = 1 - Math.abs(t - T.topEnd) / 0.12; } // dip on the cut
-  else if (t > T.crowdEnd - 0.35 && t < T.crowdEnd + 0.4) { fc.setRGB(0, 0, 0); fade = t < T.crowdEnd ? smooth((t - (T.crowdEnd - 0.35)) / 0.35) : 1 - smooth((t - T.crowdEnd) / 0.4); }
+  else if (t > T.wideEnd - 0.45 && t < T.wideEnd + 0.5) { fc.setRGB(0, 0, 0); fade = t < T.wideEnd ? smooth((t - (T.wideEnd - 0.45)) / 0.45) : 1 - smooth((t - T.wideEnd) / 0.5); }
+  else if (t > T.end - 0.35) { fc.setRGB(0, 0, 0); fade = smooth((t - (T.end - 0.35)) / 0.35); }
+  else for (const c of CUTS) if (Math.abs(t - c) < 0.12) { fc.setRGB(0.02, 0.02, 0.06); fade = Math.max(fade, 1 - Math.abs(t - c) / 0.12); } // dip on the cut
   grade.uniforms.uFade.value = fade;
   grade.uniforms.uTime.value = t;
   composer.render();

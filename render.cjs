@@ -3,7 +3,7 @@
 //   node render.cjs --stills 1,5,9 --scale 0.5   -> preview stills in frames/preview/
 const http = require('http'), fs = require('fs'), path = require('path'), { execFileSync } = require('child_process');
 const { chromium } = require('playwright');
-const ROOT = __dirname, FPS = 30, DUR = 15;
+const ROOT = __dirname, FPS = 30, DUR = 30;
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
 const scale = parseFloat(arg('scale', '1')), stills = arg('stills', null);
 const from = parseInt(arg('from', '0')), to = parseInt(arg('to', String(FPS * DUR)));
