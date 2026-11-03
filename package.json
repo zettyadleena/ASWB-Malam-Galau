@@ -1,0 +1,23 @@
+{
+  "name": "aswb-malam-galau",
+  "version": "1.0.0",
+  "description": "Marketing Drafts",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zettyadleena/ASWB-Malam-Galau.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zettyadleena/ASWB-Malam-Galau/issues"
+  },
+  "homepage": "https://github.com/zettyadleena/ASWB-Malam-Galau#readme",
+  "dependencies": {
+    "three": "^0.160.0"
+  }
+}
